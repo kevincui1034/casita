@@ -44,3 +44,9 @@ export function fmtDist(m: number | null): string {
   if (m === null) return "none nearby";
   return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`;
 }
+
+// Listing keys are "source:id"; ':' is not a valid filename character on
+// Windows, so scripts/build_isochrones.py writes files with '__' instead.
+export function isochronePath(key: string): string {
+  return `data/isochrones/${key.replace(":", "__")}.json`;
+}

@@ -10,7 +10,12 @@ import "maplibre-gl/dist/maplibre-gl.css";
 // worker is vendored into public/maplibre/ by scripts/copy-worker.mjs.
 maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 import type { Listing, Meta, Poi } from "@/lib/types";
-import { fmtPrice, listingsToGeojson, poisToGeojson } from "@/lib/toGeojson";
+import {
+  fmtPrice,
+  isochronePath,
+  listingsToGeojson,
+  poisToGeojson,
+} from "@/lib/toGeojson";
 import Legend from "./Legend";
 
 // OpenFreeMap: keyless, no rate limits, commercial use permitted.
@@ -161,6 +166,36 @@ export default function MapView(props: Props) {
         },
       });
 
+      // --- walkshed isochrone for the selected listing (optional data;
+      // empty until scripts/build_isochrones.py has run) ---
+      map.addSource("walkshed", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: "walkshed-fill",
+        type: "fill",
+        source: "walkshed",
+        paint: {
+          // Larger contour minutes = fainter fill. Context, not a control.
+          "fill-color": "#355c43",
+          "fill-opacity": [
+            "match",
+            ["get", "contour"],
+            5, 0.28,
+            10, 0.18,
+            15, 0.1,
+            0.1,
+          ],
+        },
+      });
+      map.addLayer({
+        id: "walkshed-line",
+        type: "line",
+        source: "walkshed",
+        paint: { "line-color": "#355c43", "line-width": 1, "line-opacity": 0.5 },
+      });
+
       // --- listings (on top) ---
       map.addSource("listings", {
         type: "geojson",
@@ -249,7 +284,7 @@ export default function MapView(props: Props) {
     if (map && loadedRef.current) syncData(map, props);
   }, [props.listings, props.showHexes, props.showPois]);
 
-  // ---- selection / hover highlighting + flyTo ----
+  // ---- selection / hover highlighting + flyTo + walkshed ----
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loadedRef.current) return;
@@ -258,11 +293,25 @@ export default function MapView(props: Props) {
     if (active) {
       map.setFeatureState({ source: "listings", id: active }, { active: true });
     }
+    const walkshed = map.getSource("walkshed") as
+      | maplibregl.GeoJSONSource
+      | undefined;
     if (props.selectedKey) {
       const l = props.listings.find((x) => x.key === props.selectedKey);
       if (l?.lat && l?.lng) {
         map.flyTo({ center: [l.lng, l.lat], zoom: Math.max(map.getZoom(), 13.5) });
       }
+      // Best-effort: the walkshed file only exists after the optional
+      // isochrone build. 404 -> just keep the layer empty.
+      const key = props.selectedKey;
+      fetch(isochronePath(key))
+        .then((r) => (r.ok ? r.json() : null))
+        .then((fc) => {
+          if (fc && propsRef.current.selectedKey === key) walkshed?.setData(fc);
+        })
+        .catch(() => undefined);
+    } else {
+      walkshed?.setData({ type: "FeatureCollection", features: [] });
     }
   }, [props.selectedKey, props.hoverKey, props.listings]);
 
