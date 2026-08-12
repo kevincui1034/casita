@@ -81,6 +81,57 @@ The two renderers are scoped on purpose. The Python static site stays the
 credentials-free demo and CRM surface. The dashboard is the map and
 analysis view.
 
+### How the ranking works
+
+Every listing is scored twice. Gemini reads each listing's brief, orders the
+board, and flags a severity (that's the "fit" you see on cards). A
+deterministic score in `rank.py` breaks ties and orders the map. The page
+itself sorts in buckets, active conversations first, then net-upvoted
+favorites, then the Gemini order, then new listings that haven't been ranked
+yet, with hard-gated ones at the bottom.
+
+Dog policy is the gate, and that's deliberate. A no-dogs listing scores
+-1000 and no amount of charm buys that back. Everything else is a bonus.
+
+| Signal | Points |
+| --- | --- |
+| Large dogs welcome | +12 |
+| Dogs allowed, size unstated | +6 |
+| Small dogs only | -30 |
+| No dogs | gated at -1000 |
+| Walk to a trail or Presidio gate | up to +30 (doubled, it's the stated priority) |
+| Walk to a beach | up to +15 |
+| Target neighborhood | up to +6 |
+| 3+ bedrooms, 1.5+ baths | +4, +5 |
+| In-unit laundry | +3 |
+| Parking, garage best | up to +4 |
+| Livability | up to +12 |
+
+The livability bonus is my addition, and it's capped on purpose. It sits
+level with the large-dog bonus and below the trail term, so a great
+neighborhood breaks ties between viable homes but never outranks the dogs.
+
+| Livability signal | Points |
+| --- | --- |
+| Real grocery within 800 m | +4 |
+| Park within 800 m (the dogs) | +3 |
+| Cafe cluster, 3+ cafes or bakeries within 800 m | +3 |
+| Transit stop within 400 m | +2 |
+
+The same four checks produce the errands verdict on cards and hexes. Three
+or four points reads walkable, two reads mixed, less is car-dependent.
+Distances are straight-line to the nearest place, and walk minutes assume
+4.5 km/h with a 1.3 grid factor. The walkshed you see when you select a
+listing is the real thing, a Valhalla isochrone over the street network.
+Marin listings show the full profile but skip the bonus entirely. Driving
+is normal there, and the ranking policy already forbids punishing Mill
+Valley for distance.
+
+The dashboard filters map straight onto these fields. "Fit" is the Gemini
+severity, where "show gated" reveals the hard-filtered listings that are
+hidden by default. "Dogs" filters the dog policy. "Price" caps monthly
+rent. "Errands" filters the livability verdict.
+
 One thing I chose not to build. A crime-based safety score was on my own
 wishlist, and I cut it. Marin's open crime data only covers the Sheriff's
 Office, so a cross-county score would call Mill Valley safe simply because

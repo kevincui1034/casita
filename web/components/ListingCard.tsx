@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -15,18 +16,20 @@ const SEV_STYLES: Record<string, string> = {
 
 const tag = "border-transparent px-1.5 py-0 text-[10px] font-semibold tracking-wide uppercase";
 
-export default function ListingCard({
+// Memoized: hover/selection changes re-render only the two affected cards,
+// not the whole list — scrolling stays native-smooth over 100+ cards.
+const ListingCard = memo(function ListingCard({
   listing: l,
   selected,
   hovered,
-  onClick,
-  onHover,
+  onSelectKey,
+  onHoverKey,
 }: {
   listing: Listing;
   selected: boolean;
   hovered: boolean;
-  onClick: () => void;
-  onHover: (key: string | null) => void;
+  onSelectKey: (key: string) => void;
+  onHoverKey: (key: string | null) => void;
 }) {
   const bb = [
     l.beds ? `${l.beds} bd` : null,
@@ -50,9 +53,9 @@ export default function ListingCard({
   return (
     <Card
       data-key={l.key}
-      onClick={onClick}
-      onMouseEnter={() => onHover(l.key)}
-      onMouseLeave={() => onHover(null)}
+      onClick={() => onSelectKey(l.key)}
+      onMouseEnter={() => onHoverKey(l.key)}
+      onMouseLeave={() => onHoverKey(null)}
       className={cn(
         "flex-row gap-3 rounded-lg p-2.5 shadow-none transition-colors",
         "cursor-pointer hover:border-primary/60",
@@ -102,4 +105,6 @@ export default function ListingCard({
       </div>
     </Card>
   );
-}
+});
+
+export default ListingCard;

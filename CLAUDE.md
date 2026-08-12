@@ -11,3 +11,8 @@ AGENTS.md
 - Note: `web/components/ui/scroll-area.tsx` carries a deliberate `[&>div]`
   override — Radix's viewport wrapper is `display: table`, which breaks
   flex-wrap/truncate inside; keep that override when regenerating the component.
+- Scrolling: use NATIVE `overflow-y-auto` for long lists (the global thin
+  scrollbar CSS keeps the minimal look) — Radix/shadcn ScrollArea positions
+  its thumb from JS and visibly lags on long content. ScrollArea is fine for
+  short regions like the detail drawer. Long lists also keep items memoized
+  (see ListingCard) so hover state can't re-render the whole list mid-scroll.

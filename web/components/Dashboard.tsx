@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Filters as FiltersT, Listing, Meta, Poi } from "@/lib/types";
 import FilterBar from "./Filters";
 import ListingPanel from "./ListingPanel";
@@ -65,6 +65,13 @@ export default function Dashboard() {
     [filtered, selectedKey],
   );
 
+  // Stable handlers so memoized cards don't re-render on every hover change.
+  const handleSelectKey = useCallback(
+    (key: string) => setSelectedKey((cur) => (cur === key ? null : key)),
+    [],
+  );
+  const handleHoverKey = useCallback((key: string | null) => setHoverKey(key), []);
+
   if (error) {
     return (
       <div className="grid h-dvh place-items-center px-6 text-center text-muted-foreground">
@@ -99,8 +106,8 @@ export default function Dashboard() {
           listings={filtered}
           selectedKey={selectedKey}
           hoverKey={hoverKey}
-          onSelect={setSelectedKey}
-          onHover={setHoverKey}
+          onSelectKey={handleSelectKey}
+          onHoverKey={handleHoverKey}
         />
         <div className="relative min-w-0 flex-1">
           <MapView
