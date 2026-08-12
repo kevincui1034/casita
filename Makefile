@@ -1,7 +1,10 @@
-.PHONY: install check docs demo clean
+.PHONY: install check docs demo clean poi
 
 install:
 	uv sync
+
+poi:  # dev-only, network: rebuild the committed OSM POI index (ODbL, see data/ATTRIBUTION.md)
+	uv run --with h3 python scripts/build_poi_index.py
 
 check:
 	uv run python -m compileall src scripts
