@@ -12,11 +12,15 @@ nav = [
   { "Getting Started" = "getting-started.md" },
   { "How It Works" = [
     { "Routing" = "how-it-works/routing.md" },
+    { "Livability" = "how-it-works/livability.md" },
     { "Photo Evaluation" = "how-it-works/photo-eval.md" },
     { "Deduplication" = "how-it-works/deduplication.md" },
     { "Ranking" = "how-it-works/ranking.md" },
     { "Learning" = "how-it-works/learning.md" },
     { "Static Site" = "how-it-works/static-site.md" },
+  ] },
+  { "Decisions" = [
+    { "No Safety Score" = "decisions/no-safety-score.md" },
   ] },
   { "Architecture" = "architecture.md" },
   { "Data Model" = "data-model.md" },
