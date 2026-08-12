@@ -1,5 +1,8 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+
 export default function Legend({
   hexColors,
   showHexes,
@@ -20,33 +23,40 @@ export default function Legend({
     [hexColors[0], "0–1 — car-dependent"],
   ];
   return (
-    <div className="legend">
-      <strong>Errands on foot, per hex</strong>
+    <Card className="absolute bottom-7 left-2.5 z-20 max-w-60 gap-1.5 rounded-lg p-3 text-[11.5px] text-muted-foreground shadow-md">
+      <div className="font-semibold text-foreground">Errands on foot, per hex</div>
       {rows.map(([color, label]) => (
-        <div className="row" key={label}>
-          <span className="swatch" style={{ background: color, opacity: 0.55 }} />
+        <div className="flex items-center gap-2" key={label}>
+          <span
+            className="size-3 shrink-0 rounded-[3px] opacity-60"
+            style={{ background: color }}
+          />
           {label}
         </div>
       ))}
-      <div className="row" style={{ marginTop: 2 }}>
+      <div className="mt-0.5">
         Grey areas: fewer than 5 mapped places — not scored.
       </div>
-      <div className="toggles">
-        <button
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        <Button
           type="button"
-          className={`chip${showHexes ? " on" : ""}`}
+          size="sm"
+          variant={showHexes ? "default" : "outline"}
+          className="h-6.5 rounded-full px-2.5 text-[11px]"
           onClick={() => onToggleHexes(!showHexes)}
         >
           Hexes
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className={`chip${showPois ? " on" : ""}`}
+          size="sm"
+          variant={showPois ? "default" : "outline"}
+          className="h-6.5 rounded-full px-2.5 text-[11px]"
           onClick={() => onTogglePois(!showPois)}
         >
           Places
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 }

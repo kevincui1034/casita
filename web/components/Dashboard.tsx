@@ -67,30 +67,34 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="loading">
+      <div className="grid h-dvh place-items-center px-6 text-center text-muted-foreground">
         Failed to load data: {error}. Run `casita export` first.
       </div>
     );
   }
   if (!data) {
-    return <div className="loading">Loading listings…</div>;
+    return (
+      <div className="grid h-dvh place-items-center text-muted-foreground">
+        Loading listings…
+      </div>
+    );
   }
 
   const generated = data.meta.generated_at.slice(0, 10);
 
   return (
-    <div className="shell">
-      <header className="topbar">
-        <h1>
-          <span>casita</span> · livability map
+    <div className="flex h-dvh flex-col">
+      <header className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1 border-b bg-card px-4 py-2.5">
+        <h1 className="text-lg font-semibold tracking-tight">
+          <span className="text-primary">casita</span> · livability map
         </h1>
-        <span className="meta">
+        <span className="text-xs text-muted-foreground">
           {data.meta.listing_count} listings · data as of {generated} ·{" "}
           {data.meta.source}
         </span>
       </header>
       <FilterBar filters={filters} onChange={setFilters} />
-      <div className="main">
+      <div className="flex min-h-0 flex-1 max-md:flex-col-reverse">
         <ListingPanel
           listings={filtered}
           selectedKey={selectedKey}
@@ -98,7 +102,7 @@ export default function Dashboard() {
           onSelect={setSelectedKey}
           onHover={setHoverKey}
         />
-        <div className="map-wrap">
+        <div className="relative min-w-0 flex-1">
           <MapView
             listings={filtered}
             pois={data.pois}

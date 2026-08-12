@@ -19,32 +19,33 @@ import {
 import Legend from "./Legend";
 
 // OpenFreeMap: keyless, no rate limits, commercial use permitted.
-const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
+// "bright" style matches the app's bright shadcn theme.
+const STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
 
 const SEVERITY_COLORS: Record<string, string> = {
-  ok: "#355c43",
-  concerns: "#9c7321",
-  filtered: "#a8504a",
-  unranked: "#8a8a8a",
+  ok: "#10b981",
+  concerns: "#f59e0b",
+  filtered: "#ef4444",
+  unranked: "#94a3b8",
 };
 
-// Hex fill by errands points — 4 discrete steps, muted so pins stay primary.
-// "Absence reads faster than presence": car-dependent cells get the warm warn
-// tone rather than simply fading out.
-const HEX_COLORS = ["#a8504a", "#c98d51", "#7fa06a", "#355c43"]; // 0-1, 2, 3, 4 points
+// Hex fill by errands points — 4 discrete steps, vivid but translucent so
+// pins stay primary. "Absence reads faster than presence": car-dependent
+// cells get the hot tone rather than simply fading out.
+const HEX_COLORS = ["#f87171", "#fbbf24", "#a3e635", "#10b981"]; // 0-1, 2, 3, 4 points
 
 const POI_COLORS: Record<string, string> = {
-  supermarket: "#355c43",
-  grocery: "#355c43",
-  convenience: "#7fa06a",
-  bakery: "#9c7321",
-  cafe: "#9c7321",
-  restaurant: "#c98d51",
-  park: "#4a7d5c",
-  dog_park: "#4a7d5c",
-  transit: "#4a6a8f",
-  pharmacy: "#8f4a6a",
-  school: "#6a5c8f",
+  supermarket: "#10b981",
+  grocery: "#10b981",
+  convenience: "#34d399",
+  bakery: "#f59e0b",
+  cafe: "#f59e0b",
+  restaurant: "#fb923c",
+  park: "#22c55e",
+  dog_park: "#22c55e",
+  transit: "#3b82f6",
+  pharmacy: "#ec4899",
+  school: "#8b5cf6",
 };
 
 // TS can't infer MapLibre's expression tuple types through a spread —
@@ -178,7 +179,7 @@ export default function MapView(props: Props) {
         source: "walkshed",
         paint: {
           // Larger contour minutes = fainter fill. Context, not a control.
-          "fill-color": "#355c43",
+          "fill-color": "#059669",
           "fill-opacity": [
             "match",
             ["get", "contour"],
@@ -193,7 +194,7 @@ export default function MapView(props: Props) {
         id: "walkshed-line",
         type: "line",
         source: "walkshed",
-        paint: { "line-color": "#355c43", "line-width": 1, "line-opacity": 0.5 },
+        paint: { "line-color": "#059669", "line-width": 1, "line-opacity": 0.5 },
       });
 
       // --- listings (on top) ---
