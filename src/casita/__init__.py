@@ -1208,6 +1208,65 @@ def demo(fixture: Path, host: str, port: int):
             console.print("\n[yellow]demo server stopped[/yellow]")
 
 
+@cli.command(name="export")
+@click.option(
+    "--out",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Output dir. Default: web/public/data",
+)
+@click.option(
+    "--fixture",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Export from a fixture copy instead of the live DB (credentials-free).",
+)
+@click.option("--local", is_flag=True, help="Skip GCS sync; export the local DB.")
+def export_cmd(out: Path | None, fixture: Path | None, local: bool):
+    """Export sanitized static JSON for the web/ dashboard.
+
+    Strict allowlist — contact info, votes, funnel status, and share tokens
+    never leave the database. See src/casita/export.py for the contract and
+    scripts/validate_public.py for the external check.
+    """
+    import shutil
+
+    from . import export as export_mod
+
+    out_dir = out or (ROOT / "web" / "public" / "data")
+
+    if fixture is not None:
+        # Byte-for-byte the demo command's env pattern: storage.connect()
+        # runs schema + migrations (it WRITES), so never open the committed
+        # fixture directly — copy it and point every env override at the copy.
+        export_db = ROOT / "tmp" / "export.sqlite"
+        export_db.parent.mkdir(exist_ok=True)
+        shutil.copy2(fixture, export_db)
+        env_updates = {
+            "CASITA_DB_PATH": str(export_db),
+            "CASITA_ROUTE_CACHE_DB": str(export_db),
+            "CASITA_ROUTES_OFFLINE": "1",
+        }
+        previous = {k: os.environ.get(k) for k in env_updates}
+        try:
+            os.environ.update(env_updates)
+            counts = export_mod.export_site_data(out_dir, source_label="demo-fixture")
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+    else:
+        with _cloud_or_local(local, read_only=True):
+            counts = export_mod.export_site_data(out_dir, source_label="local-db")
+
+    console.print(
+        f"[green]export:[/green] {counts['listings']} listings, "
+        f"{counts['pois']} POIs, {counts['hexes']} hexes -> {out_dir}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Cloud-synced verbs — optional private deployment helpers.
 #

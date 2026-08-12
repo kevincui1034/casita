@@ -27,8 +27,30 @@ from pathlib import Path
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import validate_public  # noqa: E402 — sibling script, shares the ban patterns
+
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "src" / "casita" / "data" / "poi_index.sqlite"
+
+
+def _sanitize_name(name: str | None) -> str | None:
+    """Drop POI names that collide with the repo's private-string bans.
+
+    OSM is public data, but the public-repo contract bans certain strings
+    (e.g. the author's street) from the tree outright — a Mill Valley POI
+    named after that street would otherwise smuggle the string back in via
+    the committed index and the web export. The POI itself is kept; only the
+    display name is dropped. Found by validate_public's export scan.
+    """
+    if not name:
+        return name
+    for pattern in validate_public.PRIVATE_PATTERNS.values():
+        if pattern.search(name):
+            return None
+    if validate_public.PERSONAL_NAME_PATTERN.search(name):
+        return None
+    return name
 
 # (south, west, north, east) — SF + southern Marin, matching the search area.
 BBOX = (37.70, -122.57, 37.96, -122.36)
@@ -186,7 +208,7 @@ def extract_pois(elements: list[dict]) -> list[dict]:
                     "osm_type": el["type"],
                     "osm_id": el["id"],
                     "category": cat,
-                    "name": tags.get("name"),
+                    "name": _sanitize_name(tags.get("name")),
                     "lat": lat,
                     "lng": lng,
                 }
