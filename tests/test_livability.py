@@ -85,3 +85,53 @@ def test_poi_meta_carries_attribution():
     meta = livability.poi_meta()
     assert "OpenStreetMap" in meta["attribution"]
     assert meta["h3_resolution"] == "8"
+
+
+# ---------- rank.score() integration ----------
+
+def _listing(**kw):
+    from casita.models import Listing
+    defaults = dict(source="manual", source_id="t1", url="https://x.test/1")
+    defaults.update(kw)
+    return Listing(**defaults)
+
+
+def test_score_no_dogs_stays_gated_despite_walkable_location():
+    from casita.rank import score
+    L = _listing(dog_policy="no_dogs", lat=INNER_RICHMOND[0], lng=INNER_RICHMOND[1])
+    assert score(L) == -1000
+
+
+def test_score_dogs_ok_always_outranks_no_dogs():
+    from casita.rank import score
+    # A no-dogs listing at the most walkable corner in the index must never
+    # outrank a dogs-ok listing at the least walkable coordinate.
+    best_loc_no_dogs = _listing(dog_policy="no_dogs",
+                                lat=INNER_RICHMOND[0], lng=INNER_RICHMOND[1])
+    worst_loc_dogs_ok = _listing(dog_policy="dogs_ok",
+                                 lat=BAY_WATER[0], lng=BAY_WATER[1])
+    assert score(worst_loc_dogs_ok) > score(best_loc_no_dogs)
+
+
+def test_score_marin_listing_gets_no_livability_bonus(monkeypatch):
+    from casita.rank import score
+    # If Marin were not suppressed, this monkeypatched bonus would add 12.
+    monkeypatch.setattr(livability, "score_bonus", lambda lat, lng: 12)
+    marin = _listing(dog_policy="dogs_ok", lat=37.9061, lng=-122.5450)
+    sf = _listing(dog_policy="dogs_ok", lat=37.7834, lng=-122.4593)
+    marin_before = score(marin)
+    monkeypatch.setattr(livability, "score_bonus", lambda lat, lng: 0)
+    assert score(marin) == marin_before               # Marin: bonus never applied
+    monkeypatch.setattr(livability, "score_bonus", lambda lat, lng: 12)
+    sf_with = score(sf)
+    monkeypatch.setattr(livability, "score_bonus", lambda lat, lng: 0)
+    assert sf_with == score(sf) + 12                  # SF: bonus applied
+
+
+def test_listing_brief_includes_livability_clause():
+    from casita.llm import _listing_brief
+    L = _listing(price=4000, beds=2, baths=1)
+    brief = _listing_brief(L, "WALKING (SF)", livability="3/4 errands on foot (walkable)")
+    assert "livability: 3/4 errands on foot (walkable)" in brief
+    # And the historical-example call shape (positional, no livability) still works.
+    assert "livability:" not in _listing_brief(L, "")

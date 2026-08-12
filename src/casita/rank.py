@@ -93,6 +93,16 @@ def score(listing: Listing, walk_map: dict | None = None) -> int:
     if listing.parking and ("garage" in listing.parking.lower()):
         s += 2
 
+    # Neighborhood livability — additive, capped at +12 by construction so it
+    # can never outweigh dog policy (the early-return gate above) or the ×2
+    # trail term. Marin gets the profile descriptively only: driving is normal
+    # there and the ranking policy already forbids distance penalties.
+    if listing.lat is not None and listing.lng is not None:
+        from . import livability
+        from .walk import is_marin
+        if not is_marin(listing):
+            s += livability.score_bonus(listing.lat, listing.lng)
+
     return s
 
 

@@ -1537,6 +1537,57 @@ def ls_cmd(status: str, neighborhood: str | None, limit: int, local: bool):
     console.print(table)
 
 
+@cli.command(name="livability")
+@click.argument("ident", required=False)
+@click.option("--lat", type=float, help="Probe a raw coordinate instead of a listing.")
+@click.option("--lng", type=float)
+@click.option("--local", is_flag=True)
+def livability_cmd(ident: str | None, lat: float | None, lng: float | None, local: bool):
+    """Show the OSM errands profile for a listing (key or address bit) or a coordinate.
+
+    Read-only. Coordinate mode (--lat/--lng) needs no database at all.
+    """
+    from . import livability as liv
+
+    label = None
+    if lat is None or lng is None:
+        if not ident:
+            console.print("[red]give a listing key/address fragment, or --lat and --lng[/red]")
+            return
+        with _cloud_or_local(local, read_only=True):
+            with storage.connect() as conn:
+                row = conn.execute(
+                    "SELECT key, address, lat, lng FROM listings "
+                    "WHERE key = ? OR address LIKE ? LIMIT 1",
+                    (ident, f"%{ident}%"),
+                ).fetchone()
+        if not row:
+            console.print(f"[yellow]no listing matching {ident!r}[/yellow]")
+            return
+        if row["lat"] is None or row["lng"] is None:
+            console.print(f"[yellow]{row['key']} has no coordinates[/yellow]")
+            return
+        lat, lng, label = row["lat"], row["lng"], row["address"] or row["key"]
+
+    p = liv.profile(lat, lng)
+    marin = lat > 37.84
+    where = label or f"{lat:.4f}, {lng:.4f}"
+    suffix = " · drive-normal area (no score bonus)" if marin else ""
+    console.print(f"[bold]{where}[/bold] — {p.summary()}{suffix}")
+    table = Table(show_lines=False)
+    for col in ["category", "nearest", "name", "within 800m"]:
+        table.add_column(col)
+    for cat in liv.CATEGORIES:
+        s = p.cats[cat]
+        table.add_row(
+            cat,
+            f"{s.nearest_m} m (~{liv.walk_minutes(s.nearest_m)} min)" if s.nearest_m is not None else "—",
+            (s.nearest_name or "")[:36],
+            str(s.count_800m),
+        )
+    console.print(table)
+
+
 @cli.group()
 def publisher():
     """Auto-publisher daemon — watches the publish-pending flag in GCS."""
