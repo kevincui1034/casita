@@ -485,7 +485,8 @@ def apply_facts(listing: Listing, facts: ExtractedFacts) -> None:
             listing.description = " · ".join(parts)
 
 
-def _listing_brief(L: Listing, walk_summary: str, feedback: str = "") -> str:
+def _listing_brief(L: Listing, walk_summary: str, feedback: str = "", *,
+                   livability: str = "") -> str:
     bits = [
         f"key: {L.key}",
         f"price: ${L.price}/mo" if L.price else "price: ?",
@@ -500,6 +501,9 @@ def _listing_brief(L: Listing, walk_summary: str, feedback: str = "") -> str:
         # with "WALKING (SF)" / "DRIVING (Marin)"); only the historical
         # example briefs pass "" — drop the empty bit there.
         f"walks: {walk_summary}" if walk_summary else "",
+        # OSM errands profile — keyword-only with a default so the historical
+        # example briefs in _preference_examples stay byte-identical.
+        f"livability: {livability}" if livability else "",
     ]
     if L.description:
         bits.append(f"vibe: {L.description[:140]}")
@@ -685,8 +689,16 @@ def rank_listings(
         return ", ".join(bits)
 
     feedback_map = _current_feedback(conn, [L.key for L in listings])
+    from . import livability as _livability
+    liv_map = {
+        L.key: _livability.brief(L.lat, L.lng, marin=is_marin(L))
+        for L in listings
+        if L.lat is not None and L.lng is not None
+    }
     body = "\n".join(
-        _listing_brief(L, _walk_summary(L), feedback_map.get(L.key, "")) for L in listings
+        _listing_brief(L, _walk_summary(L), feedback_map.get(L.key, ""),
+                       livability=liv_map.get(L.key, ""))
+        for L in listings
     )
     # Fresh human signal the static policy hasn't absorbed yet. Empty on cold
     # start → content is byte-identical to the voteless baseline.

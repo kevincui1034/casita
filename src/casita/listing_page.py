@@ -331,6 +331,62 @@ def _render_kv(L: Listing, walk_map, drive_map, drive_bakery) -> str:
                 link = _anchor_link_html(a, origin=origin, mode="walking")
                 rows.append(row("bakery", f'{m} min{WALK_SUFFIX} · {link}', _walk_class(m)))
 
+    # Livability — OSM errands profile from the committed index. Marin rows
+    # are context, not judgment: driving is normal there, so the verdict is
+    # rendered neutral and suffixed rather than color-coded.
+    if L.lat is not None and L.lng is not None:
+        from . import livability
+
+        def _liv_dist(m: int | None) -> str:
+            if m is None:
+                return "none nearby"
+            return f"{m} m" if m < 1000 else f"{m / 1000:.1f} km"
+
+        def _liv_class(m: int | None) -> str:
+            if m is None:
+                return "v warn"
+            return "v" if m <= 800 else ("v caution" if m <= 1600 else "v warn")
+
+        p = livability.profile(L.lat, L.lng)
+        if is_marin:
+            rows.append(row(
+                "errands",
+                f"{p.points}/4 on foot · {_esc(p.verdict)} (drive-normal area)",
+            ))
+        else:
+            v_cls = "v" if p.verdict == "walkable" else (
+                "v caution" if p.verdict == "mixed" else "v warn"
+            )
+            rows.append(row("errands", f"{p.points}/4 on foot · {_esc(p.verdict)}", v_cls))
+        g = min(
+            (p.cats[c] for c in livability.GROCERY_CATS if p.cats[c].nearest_m is not None),
+            key=lambda s: s.nearest_m, default=None,
+        )
+        if g:
+            name = f" · {_esc(g.nearest_name)}" if g.nearest_name else ""
+            rows.append(row("grocery", f"{_liv_dist(g.nearest_m)}{name}",
+                            "v" if is_marin else _liv_class(g.nearest_m)))
+        pk = min(
+            (p.cats[c] for c in livability.PARK_CATS if p.cats[c].nearest_m is not None),
+            key=lambda s: s.nearest_m, default=None,
+        )
+        if pk:
+            name = f" · {_esc(pk.nearest_name)}" if pk.nearest_name else ""
+            rows.append(row("park", f"{_liv_dist(pk.nearest_m)}{name}",
+                            "v" if is_marin else _liv_class(pk.nearest_m)))
+        cafes = sum(p.cats[c].count_800m for c in livability.CAFE_CATS)
+        if cafes:
+            rows.append(row("cafes", f"{cafes} within a 10 min walk"))
+        t = p.cats["transit"]
+        if t.nearest_m is not None:
+            name = f" · {_esc(t.nearest_name)}" if t.nearest_name else ""
+            rows.append(row("transit", f"{_liv_dist(t.nearest_m)}{name}",
+                            "v" if is_marin else _liv_class(t.nearest_m)))
+        d = p.cats["dog_park"]
+        if d.nearest_m is not None and d.nearest_m <= 1600:
+            name = f" · {_esc(d.nearest_name)}" if d.nearest_name else ""
+            rows.append(row("dog park", f"{_liv_dist(d.nearest_m)}{name}"))
+
     if L.contact_name or L.contact_phone or L.contact_email:
         bits = []
         if L.contact_name:

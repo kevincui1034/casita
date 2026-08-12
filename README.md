@@ -46,6 +46,30 @@ The domain assumptions are intentionally personal: large dogs, San Francisco
 walkability, Marin driving context, trails, beaches, and good bakeries nearby.
 That is the point of a personal tool.
 
+## Livability + Map Dashboard (fork addition)
+
+This fork adds neighborhood livability — what's actually around a listing —
+and a map dashboard that visualizes it:
+
+- `src/casita/livability.py` scores an "errands on foot" profile (grocery,
+  park, cafe cluster, transit) from a committed OpenStreetMap index, fully
+  offline. It feeds the deterministic rank (capped, never outweighing dog
+  policy), the LLM brief, the detail pages, and a new
+  `uv run casita livability <key>` verb. See
+  `docs/how-it-works/livability.md`.
+- `uv run casita export --fixture fixtures/demo.sqlite` writes sanitized
+  JSON (strict allowlist — no contact info, votes, or funnel status; checked
+  by `scripts/validate_public.py`) into `web/public/data/`.
+- `web/` is a static Next.js + MapLibre dashboard over that JSON: ranked
+  listings, severity-colored pins, an H3 hex livability layer, and clickable
+  OSM places, on a keyless OpenFreeMap basemap. `cd web && npm install &&
+  npm run build` — deploys anywhere static, no API keys, no database.
+
+The two renderers are scoped deliberately: the Python static site remains
+the credentials-free demo and CRM surface; the dashboard is the map and
+analysis view. A requested crime/safety layer was deliberately not built —
+the reasoning is in `docs/decisions/no-safety-score.md`.
+
 ## Docs
 
 The [documentation site](https://matin.github.io/casita/) explains the systems

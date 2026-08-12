@@ -837,6 +837,7 @@ h1 {
 .chip-dog-large_ok, .chip-dog-dogs_ok { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
 .chip-dog-small_only { color: var(--caution); background: var(--caution-soft); border-color: transparent; }
 .chip-dog-no_dogs    { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
+.chip-liv            { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
 
 /* —— conversation pill on card (compact) —— */
 .card-convo {
@@ -1501,9 +1502,18 @@ def _card(L: Listing, walk_map: dict | None = None, convo: dict | None = None,
     amenity_html = "".join(
         f'<span class="chip-tag">{_esc(a)}</span>' for a in _amenity_chips(L)
     )
+    # Livability chip — only the positive signal earns card space; the full
+    # profile lives on the detail page. Marin is suppressed (driving is normal).
+    liv_chip, liv_token = "", ""
+    if L.lat is not None and L.lng is not None:
+        from . import livability
+        from .walk import is_marin
+        liv_token = livability.verdict(L.lat, L.lng)
+        if liv_token == "walkable" and not is_marin(L):
+            liv_chip = '<span class="chip-tag chip-liv">Walkable errands</span>'
     tags_html = ""
-    if convo_pill or amenity_html:
-        tags_html = f'<div class="card-tags">{convo_pill}{amenity_html}</div>'
+    if convo_pill or amenity_html or liv_chip:
+        tags_html = f'<div class="card-tags">{convo_pill}{amenity_html}{liv_chip}</div>'
 
     address_line = ""
     if L.address:
@@ -1529,6 +1539,7 @@ def _card(L: Listing, walk_map: dict | None = None, convo: dict | None = None,
         L.outdoor_visible or "", L.other_visible or "",
         L.dog_policy or "",
         L.contact_name or "", L.contact_phone or "",
+        liv_token,  # "walkable" / "mixed" / "car-dependent" — searchable
     ]
     haystack = _esc(" | ".join(b for b in haystack_bits if b).lower())
 

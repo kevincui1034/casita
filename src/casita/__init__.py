@@ -177,7 +177,7 @@ def ingest(address: str | None, key: str | None, direction: str, channel: str,
       casita ingest --body-file ./msg.txt --address "1614 Balboa" --channel text
     """
     if body_file:
-        body = Path(body_file).read_text()
+        body = Path(body_file).read_text(encoding="utf-8")
     if not body:
         console.print("[red]no body — pass argument or --body-file[/red]")
         return
@@ -1078,7 +1078,7 @@ def _render_site(filename: str, output_dir: Path) -> dict[str, int | Path]:
 <head><meta charset="utf-8"><title>Casita</title></head>
 <body><p>No listings in DB. Run <code>casita search</code> first.</p></body>
 </html>
-""")
+""", encoding="utf-8")
         return {
             "out_html": out_html,
             "listings": 0,
@@ -1094,7 +1094,7 @@ def _render_site(filename: str, output_dir: Path) -> dict[str, int | Path]:
     out_html.write_text(html.render(
         listings, run=run, walk_map=walk_map, convo_map=convo_map,
         drive_bakery_map=drive_bakery_map, drive_map=drive_map,
-    ))
+    ), encoding="utf-8")
 
     # Per-listing detail pages — one file per active listing under tmp/listing/.
     from . import listing_page
@@ -1108,7 +1108,7 @@ def _render_site(filename: str, output_dir: Path) -> dict[str, int | Path]:
                 L, conn, walk_map=walk_map, drive_map=drive_map,
                 drive_bakery_map=drive_bakery_map,
             )
-            (listing_dir / f"{slug}.html").write_text(page_html)
+            (listing_dir / f"{slug}.html").write_text(page_html, encoding="utf-8")
             detail_count += 1
 
     _copy_static_assets(output_dir)
@@ -1206,6 +1206,65 @@ def demo(fixture: Path, host: str, port: int):
             httpd.serve_forever()
         except KeyboardInterrupt:
             console.print("\n[yellow]demo server stopped[/yellow]")
+
+
+@cli.command(name="export")
+@click.option(
+    "--out",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Output dir. Default: web/public/data",
+)
+@click.option(
+    "--fixture",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Export from a fixture copy instead of the live DB (credentials-free).",
+)
+@click.option("--local", is_flag=True, help="Skip GCS sync; export the local DB.")
+def export_cmd(out: Path | None, fixture: Path | None, local: bool):
+    """Export sanitized static JSON for the web/ dashboard.
+
+    Strict allowlist — contact info, votes, funnel status, and share tokens
+    never leave the database. See src/casita/export.py for the contract and
+    scripts/validate_public.py for the external check.
+    """
+    import shutil
+
+    from . import export as export_mod
+
+    out_dir = out or (ROOT / "web" / "public" / "data")
+
+    if fixture is not None:
+        # Byte-for-byte the demo command's env pattern: storage.connect()
+        # runs schema + migrations (it WRITES), so never open the committed
+        # fixture directly — copy it and point every env override at the copy.
+        export_db = ROOT / "tmp" / "export.sqlite"
+        export_db.parent.mkdir(exist_ok=True)
+        shutil.copy2(fixture, export_db)
+        env_updates = {
+            "CASITA_DB_PATH": str(export_db),
+            "CASITA_ROUTE_CACHE_DB": str(export_db),
+            "CASITA_ROUTES_OFFLINE": "1",
+        }
+        previous = {k: os.environ.get(k) for k in env_updates}
+        try:
+            os.environ.update(env_updates)
+            counts = export_mod.export_site_data(out_dir, source_label="demo-fixture")
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+    else:
+        with _cloud_or_local(local, read_only=True):
+            counts = export_mod.export_site_data(out_dir, source_label="local-db")
+
+    console.print(
+        f"[green]export:[/green] {counts['listings']} listings, "
+        f"{counts['pois']} POIs, {counts['hexes']} hexes -> {out_dir}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1533,6 +1592,57 @@ def ls_cmd(status: str, neighborhood: str | None, limit: int, local: bool):
             f"${r['price']:,}" if r["price"] else "?",
             (r["neighborhood_resolved"] or "")[:14],
             r["status"] or "",
+        )
+    console.print(table)
+
+
+@cli.command(name="livability")
+@click.argument("ident", required=False)
+@click.option("--lat", type=float, help="Probe a raw coordinate instead of a listing.")
+@click.option("--lng", type=float)
+@click.option("--local", is_flag=True)
+def livability_cmd(ident: str | None, lat: float | None, lng: float | None, local: bool):
+    """Show the OSM errands profile for a listing (key or address bit) or a coordinate.
+
+    Read-only. Coordinate mode (--lat/--lng) needs no database at all.
+    """
+    from . import livability as liv
+
+    label = None
+    if lat is None or lng is None:
+        if not ident:
+            console.print("[red]give a listing key/address fragment, or --lat and --lng[/red]")
+            return
+        with _cloud_or_local(local, read_only=True):
+            with storage.connect() as conn:
+                row = conn.execute(
+                    "SELECT key, address, lat, lng FROM listings "
+                    "WHERE key = ? OR address LIKE ? LIMIT 1",
+                    (ident, f"%{ident}%"),
+                ).fetchone()
+        if not row:
+            console.print(f"[yellow]no listing matching {ident!r}[/yellow]")
+            return
+        if row["lat"] is None or row["lng"] is None:
+            console.print(f"[yellow]{row['key']} has no coordinates[/yellow]")
+            return
+        lat, lng, label = row["lat"], row["lng"], row["address"] or row["key"]
+
+    p = liv.profile(lat, lng)
+    marin = lat > 37.84
+    where = label or f"{lat:.4f}, {lng:.4f}"
+    suffix = " · drive-normal area (no score bonus)" if marin else ""
+    console.print(f"[bold]{where}[/bold] — {p.summary()}{suffix}")
+    table = Table(show_lines=False)
+    for col in ["category", "nearest", "name", "within 800m"]:
+        table.add_column(col)
+    for cat in liv.CATEGORIES:
+        s = p.cats[cat]
+        table.add_row(
+            cat,
+            f"{s.nearest_m} m (~{liv.walk_minutes(s.nearest_m)} min)" if s.nearest_m is not None else "—",
+            (s.nearest_name or "")[:36],
+            str(s.count_800m),
         )
     console.print(table)
 
