@@ -46,29 +46,47 @@ The domain assumptions are intentionally personal: large dogs, San Francisco
 walkability, Marin driving context, trails, beaches, and good bakeries nearby.
 That is the point of a personal tool.
 
-## Livability + Map Dashboard (fork addition)
+## What this fork adds
 
-This fork adds neighborhood livability — what's actually around a listing —
-and a map dashboard that visualizes it:
+**Live at <https://casita-phi.vercel.app/>**
 
-- `src/casita/livability.py` scores an "errands on foot" profile (grocery,
-  park, cafe cluster, transit) from a committed OpenStreetMap index, fully
-  offline. It feeds the deterministic rank (capped, never outweighing dog
-  policy), the LLM brief, the detail pages, and a new
-  `uv run casita livability <key>` verb. See
+I wanted to answer a question the original tool never asked. A listing can
+look great on paper and still be a bad place to live. My goal was to
+understand how livable each rental actually is. Is the area walkable? Is
+there a real grocery store nearby, or only a corner liquor store? Are there
+parks for the dogs, cafes worth walking to, fun things around, a transit
+stop close enough to skip the car?
+
+So I built livability scoring on top of the existing pipeline, and a map to
+see it.
+
+- `src/casita/livability.py` scores an "errands on foot" profile for every
+  listing, built from a committed OpenStreetMap index of 8,528 places. It
+  runs fully offline. It feeds the deterministic rank (capped so it can
+  never outweigh dog policy), the LLM ranking brief, the detail pages, and
+  a new `uv run casita livability <key>` verb. The thinking lives in
   `docs/how-it-works/livability.md`.
 - `uv run casita export --fixture fixtures/demo.sqlite` writes sanitized
-  JSON (strict allowlist — no contact info, votes, or funnel status; checked
-  by `scripts/validate_public.py`) into `web/public/data/`.
-- `web/` is a static Next.js + MapLibre dashboard over that JSON: ranked
-  listings, severity-colored pins, an H3 hex livability layer, and clickable
-  OSM places, on a keyless OpenFreeMap basemap. `cd web && npm install &&
-  npm run build` — deploys anywhere static, no API keys, no database.
+  JSON into `web/public/data/`. It's a strict allowlist. Contact info,
+  votes, and funnel status never leave the database, and
+  `scripts/validate_public.py` now checks the export from the outside.
+- `web/` is a static Next.js + MapLibre dashboard over that JSON. Ranked
+  listings, an H3 hex layer showing which blocks are genuinely walkable,
+  clickable OSM places, and real 5/10/15 minute walksheds computed with
+  Valhalla. In San Francisco a ten-minute walk is nothing like a circle,
+  and the map shows it. No API keys, no database, nothing that can run up
+  a bill. `cd web && npm install && npm run build` deploys anywhere static.
 
-The two renderers are scoped deliberately: the Python static site remains
-the credentials-free demo and CRM surface; the dashboard is the map and
-analysis view. A requested crime/safety layer was deliberately not built —
-the reasoning is in `docs/decisions/no-safety-score.md`.
+The two renderers are scoped on purpose. The Python static site stays the
+credentials-free demo and CRM surface. The dashboard is the map and
+analysis view.
+
+One thing I chose not to build. A crime-based safety score was on my own
+wishlist, and I cut it. Marin's open crime data only covers the Sheriff's
+Office, so a cross-county score would call Mill Valley safe simply because
+its data is missing. The industry also walked away from crime layers in
+2021 over fair-housing risk. The reasoning is in
+`docs/decisions/no-safety-score.md`.
 
 ## Docs
 
